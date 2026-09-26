@@ -1,0 +1,42 @@
+# Credentials. config/sldl.conf is the real one and holds a Soulseek password.
+config/sldl.conf
+config/*.conf
+!config/sldl.conf.example
+
+# The client binary and its archive. AGPL, but not ours to redistribute here:
+# fetch it from the upstream release (see README).
+extracted/
+sockseek_*.tar.gz
+sockseek_*.zip
+
+# Anything a real run produces.
+logs/
+downloads/
+lists/*.csv
+lists/*.txt
+lists/sources.list
+jobs/
+*.log
+*.incomplete
+
+# Local scratch and caches.
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+tries/
+.venv/
+venv/
+
+# Backups written by earlier sessions.
+*.bak
+*.backup
+*.before-*
+*.matrix-broken
+*.ostt.bak.*
+
+# Images that are project furniture, not source.
+*.png
+*.jpg
+docs/SESSION_BREADCRUMBS.md
+OPENCODE_TASK.md

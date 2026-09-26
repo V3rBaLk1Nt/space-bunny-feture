@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#
+# sldl - Sockseek downloader launcher (offline/parser safe wrapper).
+#
+# Scope contract:
+#   * Operates only under /data/soulseek/.
+#   * No password handling: this launcher refuses flags that carry secrets
+#     (--pass, --spotify-secret, --spotify-token, --spotify-refresh,
+#     --youtube-key). Credential flows must be handled by sockseek directly.
+#   * Never performs Soulseek searching or music/media downloads.
+#
+# Usage:
+#   sldl --help | help [topic]     Show sockseek help
+#   sldl parse <input> [opts]      Parse an input offline into JSON jobs
+#   sldl run <args...>             Passthrough to sockseek (default user only)
+#   sldl self-test                 Run the parser unit test suite
+#   sldl version                   Print sldl and sockseek versions
+#
+# Any other argument (e.g. --version) is passed through to sockseek verbatim.
+
+set -u
+
+SLDL_SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+SLDL_HOME="$(dirname "$(dirname "$SLDL_SELF")")"
+SLDL_BIN="$SLDL_HOME/extracted/sockseek"
+SLDL_PARSER="$SLDL_HOME/src/sldl_parser.py"
+SLDL_TESTS="$SLDL_HOME/tests"
+SLDL_USER="${SLDL_USER:-}"
+
+die() {
+    printf 'sldl: %s\n' "$*" >&2
+    exit 1
+}
+
+sensitive_flags() {
+    # Refuse to funnel secrets through the launcher.
+    for arg in "$@"; do
+        case "$arg" in
+            --pass|--pass=*|--spotify-secret*|--spotify-token*|--spotify-refresh*|--youtube-key*)
+                die "refusing to handle secret flag '$arg'. Run sockseek directly for authenticated operations."
+                ;;
+        esac
+    done
+}
+
+[ -x "$SLDL_BIN" ] || die "sockseek binary not found or not executable: $SLDL_BIN"
+[ -f "$SLDL_PARSER" ] || die "parser not found: $SLDL_PARSER"
+
+case "${1:-}" in
+    help)
+        shift
+        exec "$SLDL_BIN" --help "$@"
+        ;;
+    parse)
+        shift
+        [ $# -ge 1 ] || { printf 'usage: sldl parse <input> [--song] [--title-col NAME] [--album-col NAME] [--artist-col NAME] [--length-col NAME] [--json FILE]\n' >&2; exit 2; }
+        exec /usr/bin/env python3 "$SLDL_PARSER" "$@"
+        ;;
+    run)
+        shift
+        sensitive_flags "$@"
+        # Inject a default user only when the caller has not set one AND one was
+        # configured. With no account, sockseek reads username from
+        # config/sldl.conf itself.
+        user_args=()
+        have_user=0
+        for arg in "$@"; do
+            case "$arg" in
+                --user|--user=*) have_user=1 ;;
+            esac
+        done
+        if [ "$have_user" -eq 0 ] && [ -n "$SLDL_USER" ]; then
+            user_args=(--user "$SLDL_USER")
+        fi
+        # Keep sockseek state isolated under the deployment root.
+        set -- "${user_args[@]}" "$@"
+        exec "$SLDL_BIN" "$@"
+        ;;
+    self-test)
+        exec /usr/bin/env python3 -m unittest discover -s "$SLDL_TESTS" -v
+        ;;
+    version)
+        printf 'sldl launcher: %s\n' "1.0.1"
+        printf 'sldl user: %s\n' "${SLDL_USER:-<from config/sldl.conf>}"
+        printf 'sockseek: '
+        "$SLDL_BIN" --version
+        ;;
+    ''|-*|*)
+        # No subcommand or flag-first invocation: passthrough (e.g. sldl --help).
+        sensitive_flags "$@"
+        exec "$SLDL_BIN" "$@"
+        ;;
+esac

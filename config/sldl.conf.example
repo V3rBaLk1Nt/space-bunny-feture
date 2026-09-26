@@ -1,0 +1,29 @@
+# sldl.conf.example - TEMPLATE ONLY, contains NO credentials.
+#
+# Copy to /data/soulseek/config/sldl.conf and fill in a REAL username and
+# password before running a real download. Do NOT put a real password in this
+# example file. Credential values here are placeholders only.
+#
+# Consumed by: /data/soulseek/run.sh via
+#   sockseek --config /data/soulseek/config/sldl.conf
+#
+# Syntax (sockseek 3.0.5):  key = value   (one per line, '#' = comment)
+
+# --- Account (REQUIRED for real downloads) ---
+username = your-soulseek-username
+# password = your-soulseek-password   <- fill in ONLY in your private copy
+
+# --- Downloads: ALL Soulseek downloads go under /data/soulseek/downloads/ ---
+output-dir = /data/soulseek/downloads/
+
+# --- Preferred quality: MP3, minimum preferred bitrate 320 kbps ---
+pref-format = mp3
+pref-min-bitrate = 320
+
+# --- Logs under /data/soulseek/logs/ ---
+log-file = /data/soulseek/logs/sldl.log
+
+# This instance only downloads; it never publishes a share or listens.
+no-listen = true
+shared-files = 0
+shared-folders = 0
