@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 128" width="160" height="128">
+  <title>Space Bunny Feture</title>
+
+  <!-- Jetpack: strapped flat across the bunny's back, flame straight down. -->
+  <g fill="#ffffff">
+    <!-- exhaust flame -->
+    <path d="M 53 116 C 43 104, 45 92, 53 88 C 61 92, 63 104, 53 116 Z"/>
+    <path d="M 53 107 C 48.5 100, 49.5 93, 53 91 C 56.5 93, 57.5 100, 53 107 Z" opacity="0.45"/>
+    <!-- nozzle -->
+    <rect x="47" y="78" width="12" height="9" rx="2.5"/>
+    <!-- tank pack, two gauge holes so it reads as a pack not a block -->
+    <path fill-rule="evenodd" d="
+      M 36 46
+      a 8 8 0 0 1 8 -8
+      L 62 38
+      a 8 8 0 0 1 8 8
+      L 70 74
+      a 8 8 0 0 1 -8 8
+      L 44 82
+      a 8 8 0 0 1 -8 -8
+      Z
+      M 46 54
+      a 3.2 3.2 0 1 0 0.02 0
+      Z
+      M 46 70
+      a 3.2 3.2 0 1 0 0.02 0
+      Z"/>
+  </g>
+
+  <!-- Bunny -->
+  <g fill="#ffffff" transform="translate(28,0)">
+    <!-- back ear -->
+    <path d="M 74 46 C 66 32, 63 12, 70 9 C 77 6, 84 26, 84 44 Z"/>
+    <!-- front ear -->
+    <path d="M 88 44 C 86 30, 90 12, 97 13 C 104 14, 101 34, 98 46 Z"/>
+
+    <!-- head, with eye punched out -->
+    <path fill-rule="evenodd" d="
+      M 86 30
+      a 20 20 0 1 0 0.02 0
+      Z
+      M 92 46
+      a 3.2 3.2 0 1 0 0.02 0
+      Z"/>
+
+    <!-- body / haunch -->
+    <path d="M 32 92
+             C 30 70, 44 54, 64 52
+             C 80 50, 92 58, 92 72
+             C 92 86, 84 94, 72 94
+             L 44 94
+             C 36 94, 32 94, 32 92 Z"/>
+
+    <!-- legs -->
+    <rect x="42" y="82" width="14" height="24" rx="6"/>
+    <rect x="78" y="80" width="14" height="26" rx="6"/>
+
+    <!-- 45 RPM record inserts for feet -->
+    <g transform="translate(49,108)">
+      <path fill-rule="evenodd" d="
+        M 0 -13
+        a 13 13 0 1 0 0.02 0
+        Z
+        M 0 -3.2
+        a 3.2 3.2 0 1 0 0.02 0
+        Z
+        M 0 -7.5
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 6.5 -3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 6.5 3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 0 7.5
+        a 2 2 0 1 0 0.02 0
+        Z
+        M -6.5 3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M -6.5 -3.75
+        a 2 2 0 1 0 0.02 0
+        Z"/>
+    </g>
+
+    <g transform="translate(85,108)">
+      <path fill-rule="evenodd" d="
+        M 0 -13
+        a 13 13 0 1 0 0.02 0
+        Z
+        M 0 -3.2
+        a 3.2 3.2 0 1 0 0.02 0
+        Z
+        M 0 -7.5
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 6.5 -3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 6.5 3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M 0 7.5
+        a 2 2 0 1 0 0.02 0
+        Z
+        M -6.5 3.75
+        a 2 2 0 1 0 0.02 0
+        Z
+        M -6.5 -3.75
+        a 2 2 0 1 0 0.02 0
+        Z"/>
+    </g>
+
+    <!-- tape bridging the two records -->
+    <rect x="49" y="103" width="36" height="3" rx="1.5" opacity="0.85"/>
+  </g>
+</svg>
