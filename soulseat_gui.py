@@ -473,54 +473,55 @@ class BunnyGauge:
         else:
             disc = BUNNY["wheel"]
 
-        self._draw_jetpack(c, pack, trim, working)
         self._draw_bunny(c, body)
+        self._draw_jetpack(c, pack, trim, working)
         self._draw_records(c, disc)
 
     def _draw_jetpack(self, c, pack, trim, working):
-        """Two tanks, a strapped mounting plate, cooling fins and a nozzle.
+        """Two small tanks strapped across the middle of his back.
 
-        Drawn before the bunny so the pack sits behind his back, the way it
-        would actually be worn.
+        Drawn after the body so it sits on top of him, strapped on, rather than
+        hanging off the rear like a tail. Kept deliberately small: it is a
+        detail on his back, not a second character.
         """
         # mounting plate across the shoulders
-        c.create_rectangle(8, 22, 42, 34, fill=trim, outline="")
+        c.create_rectangle(63, 22, 87, 28, fill=trim, outline="")
         # two tanks with a highlight down the front of each
-        c.create_rectangle(11, 30, 23, 62, fill=pack, outline="")
-        c.create_rectangle(27, 30, 39, 62, fill=pack, outline="")
-        c.create_rectangle(13, 34, 16, 58, fill=trim, outline="")
-        c.create_rectangle(29, 34, 32, 58, fill=trim, outline="")
-        # straps holding the tanks to the plate
-        c.create_rectangle(10, 38, 40, 41, fill=trim, outline="")
-        c.create_rectangle(10, 52, 40, 55, fill=trim, outline="")
-        # rivets
-        for rx in (12, 21, 28, 37):
-            c.create_oval(rx, 24, rx + 2, 26, fill=pack, outline="")
-        # cooling fins on the back edge
-        for fy in (34, 42, 50):
-            c.create_polygon(4, fy, 11, fy - 3, 11, fy + 3,
+        c.create_rectangle(65, 27, 73, 48, fill=pack, outline="")
+        c.create_rectangle(76, 27, 84, 48, fill=pack, outline="")
+        c.create_rectangle(66.5, 30, 68.5, 45, fill=trim, outline="")
+        c.create_rectangle(77.5, 30, 79.5, 45, fill=trim, outline="")
+        # straps holding the tanks to his back
+        c.create_rectangle(64, 32, 85, 34, fill=trim, outline="")
+        c.create_rectangle(64, 41, 85, 43, fill=trim, outline="")
+        # rivets along the plate
+        for rx in (65, 71, 77, 83):
+            c.create_oval(rx, 23, rx + 2, 25, fill=pack, outline="")
+        # cooling fins on the trailing edge
+        for fy in (30, 37, 44):
+            c.create_polygon(58, fy, 64, fy - 2, 64, fy + 2,
                              fill=trim, outline="")
         # nozzle housing and throat
-        c.create_rectangle(16, 62, 34, 70, fill=pack, outline="")
-        c.create_polygon(16, 70, 34, 70, 30, 76, 20, 76,
+        c.create_rectangle(69, 48, 81, 53, fill=pack, outline="")
+        c.create_polygon(69, 53, 81, 53, 78, 57, 72, 57,
                          fill=trim, outline="")
 
         if working:
-            # Flame: shoots a little further past the nozzle on each flicker
-            # step, so it dances instead of sitting still. nozzle_x is the
-            # centreline of the throat, lip_y the lip the flame leaves from.
-            reach = self.FLICKER[self._flick] * 20.0
-            nozzle_x, lip_y = 25.0, 76.0
+            # Flame: a short flick past the nozzle, length changing on each
+            # flicker step so it dances instead of sitting still. nozzle_x is
+            # the centreline of the throat, lip_y the lip it leaves from.
+            reach = self.FLICKER[self._flick] * 11.0
+            nozzle_x, lip_y = 75.0, 57.0
             c.create_polygon(
-                nozzle_x - 4, lip_y, nozzle_x + 4, lip_y,
-                nozzle_x + 1.5 + reach * 0.16, lip_y + reach,
+                nozzle_x - 3, lip_y, nozzle_x + 3, lip_y,
+                nozzle_x + 1.0 + reach * 0.14, lip_y + reach,
                 fill=BUNNY["flame"], outline="")
             c.create_polygon(
-                nozzle_x - 2, lip_y, nozzle_x + 2, lip_y,
-                nozzle_x + 0.8 + reach * 0.10, lip_y + reach * 0.55,
+                nozzle_x - 1.5, lip_y, nozzle_x + 1.5, lip_y,
+                nozzle_x + 0.6 + reach * 0.09, lip_y + reach * 0.55,
                 fill=BUNNY["flame_core"], outline="")
         else:
-            c.create_rectangle(21, 74, 29, 77, fill=trim, outline="")
+            c.create_rectangle(72, 56, 78, 58, fill=trim, outline="")
 
     def _draw_bunny(self, c, body):
         """Green bunny, facing right, ears up, eye punched back out."""
