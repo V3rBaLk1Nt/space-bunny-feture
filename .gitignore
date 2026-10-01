@@ -47,7 +47,8 @@ venv/
 # Images that are project furniture, not source.
 *.png
 *.jpg
-# ...but the app icon IS the product now, so it ships.
+# ...but the app's own artwork IS the product now, so it ships.
 !assets/icons/*.svg
+!assets/*.jpg
 docs/SESSION_BREADCRUMBS.md
 OPENCODE_TASK.md

@@ -22,6 +22,7 @@ Behaviour contract (matches the strict scope for this deployment):
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import subprocess
 import sys
@@ -43,16 +44,28 @@ DARK = {
     "panel": "#17181d",       # headings / status bar background
     "panel_alt": "#22242c",   # button hover / raised areas
     "entry": "#0a0b0d",       # text / list / log areas
-    "fg": "#eaf2ea",          # primary text
-    "heading_fg": "#d9f2da",  # column headings / status text
-    "log_fg": "#46d968",      # status-log text (cyber green)
-    "muted": "#6f747c",       # disabled / secondary text
+    "fg": "#eef3ef",          # primary text
+    "heading_fg": "#e6ece8",  # column headings / status text
+    "log_fg": "#d5e0d9",      # status-log text
+    "muted": "#8b9299",       # disabled / secondary text
     "accent": "#155a2e",      # selection background
     "accent_fg": "#ffffff",   # selection foreground
     "btn": "#1d2026",         # button background
     "btn_active": "#2c3a2c",  # button hover
     "border": "#2a2f36",      # focus outlines / separators
     "trough": "#131519",      # scrollbar trough
+}
+
+# Space Bunny Feture state colours. Green bunny while downloading, reels that
+# turn red and stop when it lands, a jetpack that stays white, an orange flame.
+BUNNY = {
+    "body": "#3ddc84",        # bunny, green in every state
+    "pack": "#f2f5f3",        # jetpack tanks, white
+    "trim": "#7f8a86",        # plate, straps, fins, nozzle
+    "flame": "#ff8c1a",       # exhaust, only while working
+    "flame_core": "#ffd166",  # hotter core inside the flame
+    "wheel": "#f5d033",        # 45s while turning, and while idle
+    "wheel_done": "#e0483c",  # 45s stopped: red
 }
 
 # Font sizes scale with the window instead of being fixed pixel counts, so the
@@ -64,12 +77,19 @@ _watch = []          # widget + option-database Font objects kept alive
 _scale_bindings = []  # (root, callback) pairs re-applied on resize
 
 FONT = {
-    "base": ("DejaVu Sans Mono", 22),
-    "list": ("DejaVu Sans Mono", 24),
-    "button": ("DejaVu Sans Mono", 21),
-    "heading": ("DejaVu Sans Mono", 26),
-    "mono": ("DejaVu Sans Mono", 23),
+    "base": ("VT323", 24),
+    "list": ("VT323", 26),
+    "button": ("VT323", 26),
+    "heading": ("VT323", 28),
+    "mono": ("VT323", 25),
 }
+
+# VT323 is the dot-matrix face this deployment asks for. It has to exist, or the
+# GUI silently falls back to a proportional face and the whole look is lost.
+UI_FONT = "VT323"
+
+# Height of the circuit-board strip pinned along the top edge.
+BANNER_H = 78
 
 
 def _ui_scale(root):
@@ -95,27 +115,26 @@ def _resolve_fonts(root):
     """
     import tkinter.font as tkfont
     families = set(tkfont.families(root))
-    sans = next((f for f in ("DejaVu Sans", "Noto Sans",
-                             "Liberation Sans", "Helvetica")
-                 if f in families), "TkDefaultFont")
-    mono = next((f for f in ("DejaVu Sans Mono", "Noto Sans Mono",
-                             "Liberation Mono")
-                 if f in families), "TkFixedFont")
+    mono = UI_FONT if UI_FONT in families else next(
+        (f for f in ("DejaVu Sans Mono", "Noto Sans Mono",
+                     "Liberation Mono")
+         if f in families), "TkFixedFont")
+    sans = mono
     scale = _ui_scale(root)
-    for key, (family, size) in {
-            "base": (sans, 22), "list": (sans, 24),
-            "button": (sans, 21), "heading": (sans, 26),
-            "mono": (mono, 23)}.items():
-        FONT[key] = (family, max(11, int(round(size * scale))))
+    for key, (_family, size) in {
+            "base": (sans, 24), "list": (sans, 26),
+            "button": (sans, 26), "heading": (sans, 28),
+            "mono": (sans, 25)}.items():
+        FONT[key] = (mono, max(11, int(round(size * scale))))
     _register_option_fonts(root, sans, scale)
 
 
 def _register_option_fonts(root, sans, scale):
     import tkinter.font as tkfont
     for opt, family, size in (
-            ("*Font", sans, 22), ("*Button.font", sans, 21),
-            ("*Text.font", sans, 22), ("*Listbox.font", sans, 22),
-            ("*TCombobox*Listbox.font", sans, 22)):
+            ("*Font", sans, 24), ("*Button.font", sans, 26),
+            ("*Text.font", sans, 25), ("*Listbox.font", sans, 25),
+            ("*TCombobox*Listbox.font", sans, 25)):
         f = tkfont.Font(root=root, family=family,
                         size=max(11, int(round(size * scale))))
         _watch.append(f)
@@ -167,7 +186,7 @@ def _apply_dark_theme(root):
                     selectforeground=DARK["accent_fg"])
     style.configure("Dark.Treeview", background=DARK["entry"],
                     fieldbackground=DARK["entry"], foreground=DARK["fg"],
-                    font=FONT["list"], rowheight=42, borderwidth=0)
+                    font=FONT["list"], rowheight=58, borderwidth=0)
     style.map("Dark.Treeview",
               background=[("selected", DARK["accent"])],
               foreground=[("selected", DARK["accent_fg"])])
@@ -246,16 +265,32 @@ def parse_playlist(path: str) -> dict:
     return _get_parser().normalize_input(path)
 
 
+def _elide(text: str, limit: int) -> str:
+    """Shorten a long path from the middle, keeping both ends readable.
+
+    A playlist added from a deep folder produced a header that ran off the
+    right edge of the column, and the trailing "(N entries, type=csv)" count
+    was what got cut. Eliding the middle drops the redundant middle instead.
+    """
+    text = str(text)
+    if len(text) <= limit:
+        return text
+    keep = limit - 3
+    head = keep // 2
+    tail = keep - head
+    return f"{text[:head]}...{text[-tail:]}"
+
+
 def playlist_display_lines(path: str):
     """Return a list of display lines for one playlist (file name + entries)."""
     try:
         result = parse_playlist(path)
     except Exception as exc:  # noqa: BLE001 - surfaced into the GUI status
-        return [f"{path}: ERROR - {exc}"]
+        return [f"{_elide(path, 64)}: ERROR - {exc}"]
     singular = len(result["jobs"]) == 1
     lines = [
-        f"{path}  ({len(result['jobs'])} entr{'y' if singular else 'ies'}, "
-        f"type={result['inputType']})"
+        f"{_elide(path, 64)}  ({len(result['jobs'])} "
+        f"entr{'y' if singular else 'ies'}, type={result['inputType']})"
     ]
     for job in result["jobs"]:
         lines.append("   " + format_job(job))
@@ -349,6 +384,189 @@ def self_test(files):
 # GUI (Tkinter, standard library).
 # ---------------------------------------------------------------------------
 
+class BunnyGauge:
+    """The Space Bunny Feture indicator that lives in the status strip.
+
+    The bunny rides on two 45 RPM record inserts instead of feet: a disc with a
+    spindle hole and three lightening holes, which is what turns when it is
+    working. Three states, told apart from across the room:
+
+      idle     green bunny, yellow records, no flame. Nothing asked for yet.
+      working  green bunny, yellow records spinning, orange flame flickering.
+      done     green bunny stays, records turn red and stop, flame out.
+
+    Everything redraws on one timer tick rather than animating per item, so the
+    spin and the flicker share a clock instead of drifting across a dozen
+    separate after() calls.
+    """
+
+    WIDTH, HEIGHT = 178, 104
+
+    RECORDS = ((62, 84), (100, 84))   # 45s, where the feet would be
+    DISC_R = 12
+    SPIN_DEG = 14.0                   # per tick
+    TICK_MS = 45
+    FLICKER = (0.55, 0.85, 1.0, 0.72, 0.95, 0.62)
+
+    def __init__(self, parent, tk):
+        self.tk = tk
+        self.state = "idle"
+        self.angle = 0.0
+        self._flick = 0
+        self._job = None
+        self.canvas = tk.Canvas(
+            parent, width=self.WIDTH, height=self.HEIGHT,
+            bg=DARK["panel"], highlightthickness=0, bd=0)
+        self._draw()
+
+    # ---- state -------------------------------------------------------------
+
+    def set_state(self, state):
+        """idle | working | done. Returns immediately; the timer does the rest."""
+        if state == self.state:
+            return
+        self.state = state
+        if state == "working":
+            if self._job is None:
+                self._schedule()
+        else:
+            self._stop()
+        self._draw()
+
+    def destroy(self):
+        self._stop()
+
+    def _schedule(self):
+        self._job = self.canvas.after(self.TICK_MS, self._tick)
+
+    def _stop(self):
+        if self._job is not None:
+            try:
+                self.canvas.after_cancel(self._job)
+            except Exception:  # noqa: BLE001 - the widget may already be gone
+                pass
+            self._job = None
+
+    def _tick(self):
+        self._job = None
+        if self.state != "working":
+            return
+        self.angle = (self.angle + self.SPIN_DEG) % 360
+        self._flick = (self._flick + 1) % len(self.FLICKER)
+        self._draw()
+        self._schedule()
+
+    # ---- drawing -----------------------------------------------------------
+
+    def _draw(self):
+        c = self.canvas
+        c.delete("all")
+
+        working = self.state == "working"
+        body = BUNNY["body"]
+        pack = BUNNY["pack"]
+        trim = BUNNY["trim"]
+        if working:
+            disc = BUNNY["wheel"]
+        elif self.state == "done":
+            disc = BUNNY["wheel_done"]
+        else:
+            disc = BUNNY["wheel"]
+
+        self._draw_jetpack(c, pack, trim, working)
+        self._draw_bunny(c, body)
+        self._draw_records(c, disc)
+
+    def _draw_jetpack(self, c, pack, trim, working):
+        """Two tanks, a strapped mounting plate, cooling fins and a nozzle.
+
+        Drawn before the bunny so the pack sits behind his back, the way it
+        would actually be worn.
+        """
+        # mounting plate across the shoulders
+        c.create_rectangle(8, 22, 42, 34, fill=trim, outline="")
+        # two tanks with a highlight down the front of each
+        c.create_rectangle(11, 30, 23, 62, fill=pack, outline="")
+        c.create_rectangle(27, 30, 39, 62, fill=pack, outline="")
+        c.create_rectangle(13, 34, 16, 58, fill=trim, outline="")
+        c.create_rectangle(29, 34, 32, 58, fill=trim, outline="")
+        # straps holding the tanks to the plate
+        c.create_rectangle(10, 38, 40, 41, fill=trim, outline="")
+        c.create_rectangle(10, 52, 40, 55, fill=trim, outline="")
+        # rivets
+        for rx in (12, 21, 28, 37):
+            c.create_oval(rx, 24, rx + 2, 26, fill=pack, outline="")
+        # cooling fins on the back edge
+        for fy in (34, 42, 50):
+            c.create_polygon(4, fy, 11, fy - 3, 11, fy + 3,
+                             fill=trim, outline="")
+        # nozzle housing and throat
+        c.create_rectangle(16, 62, 34, 70, fill=pack, outline="")
+        c.create_polygon(16, 70, 34, 70, 30, 76, 20, 76,
+                         fill=trim, outline="")
+
+        if working:
+            # Flame: shoots a little further past the nozzle on each flicker
+            # step, so it dances instead of sitting still. nozzle_x is the
+            # centreline of the throat, lip_y the lip the flame leaves from.
+            reach = self.FLICKER[self._flick] * 20.0
+            nozzle_x, lip_y = 25.0, 76.0
+            c.create_polygon(
+                nozzle_x - 4, lip_y, nozzle_x + 4, lip_y,
+                nozzle_x + 1.5 + reach * 0.16, lip_y + reach,
+                fill=BUNNY["flame"], outline="")
+            c.create_polygon(
+                nozzle_x - 2, lip_y, nozzle_x + 2, lip_y,
+                nozzle_x + 0.8 + reach * 0.10, lip_y + reach * 0.55,
+                fill=BUNNY["flame_core"], outline="")
+        else:
+            c.create_rectangle(21, 74, 29, 77, fill=trim, outline="")
+
+    def _draw_bunny(self, c, body):
+        """Green bunny, facing right, ears up, eye punched back out."""
+        # legs down to the records
+        c.create_rectangle(55, 60, 69, 76, fill=body, outline="")
+        c.create_rectangle(93, 58, 107, 74, fill=body, outline="")
+        # body and haunch
+        c.create_oval(40, 26, 106, 78, fill=body, outline="")
+        # ears: drawn before the head, tall and narrow, so what clears the
+        # skull reads as two upright ears rather than two bumps
+        c.create_oval(94, -2, 104, 30, fill=body, outline="")
+        c.create_oval(107, 0, 117, 30, fill=body, outline="")
+        # head
+        c.create_oval(98, 12, 134, 46, fill=body, outline="")
+        # eye
+        c.create_oval(120, 24, 126, 30, fill=DARK["panel"], outline="")
+
+    def _draw_records(self, c, disc):
+        """Two 45 RPM inserts: a disc, a spindle hole, three lightening holes.
+
+        The three holes are what make the spin readable. A plain disc rotating
+        looks identical at every angle, so the turn would not register as
+        movement at all.
+        """
+        # tape bridging the two, tinted to match the disc
+        c.create_rectangle(62, 79, 100, 83, fill=disc, outline="")
+        for cx, cy in self.RECORDS:
+            c.create_oval(cx - self.DISC_R, cy - self.DISC_R,
+                          cx + self.DISC_R, cy + self.DISC_R,
+                          fill=disc, outline="")
+            # rim groove
+            c.create_oval(cx - self.DISC_R + 2, cy - self.DISC_R + 2,
+                          cx + self.DISC_R - 2, cy + self.DISC_R - 2,
+                          fill="", outline=DARK["panel"], width=1)
+            # three lightening holes, the part that shows the turn
+            for k in range(3):
+                a = (self.angle + k * 120.0) * math.pi / 180.0
+                hx = cx + 7.0 * math.cos(a)
+                hy = cy + 7.0 * math.sin(a)
+                c.create_oval(hx - 2, hy - 2, hx + 2, hy + 2,
+                              fill=DARK["panel"], outline="")
+            # spindle hole
+            c.create_oval(cx - 3, cy - 3, cx + 3, cy + 3,
+                          fill=DARK["panel"], outline="")
+
+
 class SoulseekApp:
     def __init__(self, root, initial_files, dry_run=False):
         import tkinter as tk
@@ -370,20 +588,33 @@ class SoulseekApp:
         self._cyber_bg_image = None
         self._cyber_bg = None
         self._cyber_bg_src = None
+        self._banner_image = None
+        self._banner = None
         bg_dir = Path(__file__).resolve().parent
-        variant = os.environ.get("SOULSEEK_BG", "futuristic").strip().lower()
-        if variant in ("dark", "darkhand", "darkhands", "michelangelo_hands_dark"):
-            bg_stem = "soulseek_cyber_background_dark"
+        assets = bg_dir / "assets"
+        # The window wall is the portrait circuit board, already knocked back to
+        # 34% so the file list stays readable on top of it. The horizontal strip
+        # along the top edge is the wide one. Both fall back to nothing rather
+        # than back to the old Michelangelo hands.
+        wall = self._first_readable(
+            tk, [assets / "circuit_board_wall_dim.jpg",
+                 assets / "circuit_board_wall_dim.png"])
+        if wall is not None:
+            self._place_wall(wall)
         else:
-            bg_stem = "soulseek_cyber_background"
-        if (self._try_background(tk, bg_dir / f"{bg_stem}.png")
-                or self._try_background(tk, bg_dir / f"{bg_stem}.jpg")):
-            pass
-        else:
-            print("Cyber background disabled: no readable background image "
-                  "next to soulseat_gui.py")
+            print("Circuit-board wall not found under assets/; "
+                  "window background left flat.")
+
+        banner = self._first_readable(
+            tk, [assets / "circuit_board_banner_strip.jpg",
+                 assets / "circuit_board_banner_strip.png"])
+        if banner is not None:
+            self._banner_image = banner
+            self._banner = tk.Label(root, image=banner, bd=0,
+                                    anchor="center", bg=DARK["bg"])
+            self._banner.place(x=0, y=0, relwidth=1, height=BANNER_H)
         bar = tk.Frame(root, padx=8, pady=6, bg=DARK["bg"])
-        bar.pack(side="top", fill="x")
+        bar.pack(side="top", fill="x", pady=(BANNER_H + 4, 6))
 
         self.btn_add = _dark_button(bar, "Add Playlist...", self._pick_files)
         self.btn_add.pack(side="left")
@@ -405,6 +636,12 @@ class SoulseekApp:
         )
         self.status.pack(side="bottom", fill="x")
 
+        # The bunny sits in the status strip on the right: the system-monitor
+        # end of the bar, so it reads as part of the running state rather than
+        # as decoration stuck in the middle of the file list.
+        self.bunny = BunnyGauge(self.status, tk)
+        self.bunny.canvas.pack(side="right", padx=(10, 0))
+
         cols = ("file", "entry")
         self.tree = ttk.Treeview(
             root, columns=cols, show="headings", style="Dark.Treeview",
@@ -422,7 +659,7 @@ class SoulseekApp:
         ys.pack(side="right", fill="y")
 
         self.log = scrolledtext.ScrolledText(
-            root, height=8, state="disabled", font=FONT["mono"],
+            root, height=6, state="disabled", font=FONT["mono"],
             bg=DARK["entry"], fg=DARK["log_fg"], insertbackground=DARK["fg"],
             relief="flat", bd=0, highlightthickness=1,
             highlightbackground=DARK["border"], highlightcolor=DARK["border"],
@@ -436,6 +673,45 @@ class SoulseekApp:
         self.root.after(100, self._pump_queue)
 
     # ---- status helpers ----------------------------------------------------
+
+    def _first_readable(self, tk, candidates):
+        """First candidate path this Tk build can actually decode into pixels.
+
+        Tk 8.6 reads PNG on its own but not JPEG, so the JPEG originals go
+        through ImageMagick (or Pillow) first. Returns the PhotoImage, not the
+        path, because a caller wants something it can place.
+        """
+        for path in candidates:
+            if not path.is_file():
+                continue
+            photo = None
+            try:
+                photo = tk.PhotoImage(file=path)
+            except tk.TclError:
+                photo = None
+            if photo is None and path.suffix.lower() in (".jpg", ".jpeg"):
+                photo = self._background_from_magick(tk, path)
+            if photo is None:
+                photo = self._background_from_pil(tk, path)
+            if photo is not None:
+                return photo
+        return None
+
+    def _place_wall(self, photo):
+        """Lay the dimmed circuit board behind everything else in the window.
+
+        Tk has no real alpha, so this only shows through where the widgets above
+        it are not fully opaque. That is deliberate: the file list keeps its own
+        solid panels and the wall reads through the gaps around them.
+        """
+        import tkinter as tk
+        self._cyber_bg_image = photo
+        self._cyber_bg_src = photo
+        self._cyber_bg = tk.Label(
+            self.root, image=photo, bd=0, anchor="center", bg="#04070a")
+        self._cyber_bg.place(x=0, y=0, relwidth=1, relheight=1)
+        self._cyber_bg.lower()
+        self.root.bind("<Configure>", self._fit_background, add="+")
 
     def _try_background(self, tk, bg_path):
         """Place a background image behind the widgets.
@@ -612,15 +888,22 @@ class SoulseekApp:
             self._log_line(f"already queued: {path}\n")
             return
         self.playlists.append(path)
-        for line in playlist_display_lines(path):
+        lines = playlist_display_lines(path)
+        for index, line in enumerate(lines):
+            # The file name belongs to the playlist, not to each of its rows.
+            # Repeating it down every line is what made the list unreadable:
+            # the column filled with one name and the actual entries vanished
+            # into the noise beside it.
+            name = os.path.basename(path) if index == 0 else ""
+            stripped = line.strip()
             if line.startswith("   "):
                 self.tree.insert(
                     "", "end",
-                    values=(os.path.basename(path), line.strip()),
-                    tags=("folder",) if line.strip().startswith(("Album:", "Folder:")) else (),
+                    values=(name, stripped),
+                    tags=("folder",) if stripped.startswith(("Album:", "Folder:")) else (),
                 )
             else:
-                self.tree.insert("", "end", values=(os.path.basename(path), line))
+                self.tree.insert("", "end", values=(name, line))
         self._flash_status(f"Added {path} (parsed offline; no download).")
 
     def _clear_all(self):
@@ -641,6 +924,7 @@ class SoulseekApp:
             self._flash_status("No playlists queued.")
             return
         self.running = True
+        self.bunny.set_state("working")
         self.btn_run.configure(state="disabled")
         self.btn_add.configure(state="disabled")
         self._log_line(
@@ -675,6 +959,7 @@ class SoulseekApp:
 
     def _download_finished(self, results):
         self.running = False
+        self.bunny.set_state("done")
         self.btn_run.configure(state="normal")
         self.btn_add.configure(state="normal")
         ok = 0
