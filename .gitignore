@@ -19,6 +19,15 @@ jobs/
 *.log
 *.incomplete
 
+# Music pulled off Soulseek. Never source: this is other people's audio.
+OffRoadSelector*/
+*.mp3
+*.flac
+*.m4a
+*.ogg
+*.opus
+*.wav
+
 # Local scratch and caches.
 __pycache__/
 *.pyc
@@ -38,5 +47,7 @@ venv/
 # Images that are project furniture, not source.
 *.png
 *.jpg
+# ...but the app icon IS the product now, so it ships.
+!assets/icons/*.svg
 docs/SESSION_BREADCRUMBS.md
 OPENCODE_TASK.md
